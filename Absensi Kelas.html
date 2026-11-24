@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplikasi Absensi Siswa</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+  body { background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; padding: 20px; }
+  .container { max-width: 1000px; margin: 0 auto; background: #fff; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+  h1 { text-align: center; color: #333; margin-bottom: 20px; }
+  .info-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .date-box { background: #f0f2ff; padding: 10px 15px; border-radius: 8px; color: #555; font-size: 14px; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+  .stat.hadir { background: #d4edda; color: #155724; }
+  .stat.sakit { background: #fff3cd; color: #856404; }
+  .stat.izin { background: #cce5ff; color: #004085; }
+  .stat.alpha { background: #f8d7da; color: #721c24; }
+  
+  .add-form { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .add-form input { flex: 1; min-width: 150px; padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+  .add-form input:focus { outline: none; border-color: #667eea; }
+  .add-form button { padding: 10px 20px; background: #667eea; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+  .add-form button:hover { background: #5568d3; }
+  
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th { background: #667eea; color: #fff; padding: 12px; text-align: left; font-size: 14px; }
+  td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+  tr:hover { background: #f9f9ff; }
+  
+  .btn-group { display: flex; gap: 5px; flex-wrap: wrap; }
+  .btn-status { padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: 0.2s; }
+  .btn-status.active { transform: scale(1.05); box-shadow: 0 0 0 2px #333 inset; }
+  .btn-hadir { background: #d4edda; color: #155724; }
+  .btn-sakit { background: #fff3cd; color: #856404; }
+  .btn-izin { background: #cce5ff; color: #004085; }
+  .btn-alpha { background: #f8d7da; color: #721c24; }
+  .btn-hapus { background: #dc3545; color: #fff; padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .btn-hapus:hover { background: #c82333; }
+  
+  .actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-export { padding: 10px 20px; background: #28a745; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .btn-reset { padding: 10px 20px; background: #ffc107; color: #333; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .btn-export:hover { background: #218838; }
+  .btn-reset:hover { background: #e0a800; }
+  
+  .empty { text-align: center; padding: 30px; color: #999; }
+  
+  @media (max-width: 600px) {
+    table { font-size: 12px; }
+    th, td { padding: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📋 Aplikasi Absensi Siswa</h1>
+  
+  <div class="info-bar">
+    <div class="date-box" id="dateBox"></div>
+    <div class="stats" id="stats"></div>
+  </div>
+  
+  <div class="add-form">
+    <input type="text" id="inputNama" placeholder="Nama Siswa">
+    <input type="text" id="inputKelas" placeholder="Kelas (contoh: X-A)">
+    <button onclick="tambahSiswa()">➕ Tambah Siswa</button>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Nama</th>
+        <th>Kelas</th>
+        <th>Status Kehadiran</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  
+  <div class="actions">
+    <button class="btn-export" onclick="exportData()">📥 Export CSV</button>
+    <button class="btn-reset" onclick="resetSemua()">🔄 Reset Status</button>
+  </div>
+</div>
+
+<script>
+  // Data siswa tersimpan di localStorage
+  let dataSiswa = JSON.parse(localStorage.getItem('absensiSiswa')) || [];
+  
+  // Tanggal hari ini
+  const today = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById('dateBox').textContent = '📅 ' + today.toLocaleDateString('id-ID', options);
+  
+  function simpan() {
+    localStorage.setItem('absensiSiswa', JSON.stringify(dataSiswa));
+  }
+  
+  function tambahSiswa() {
+    const nama = document.getElementById('inputNama').value.trim();
+    const kelas = document.getElementById('inputKelas').value.trim();
+    
+    if (!nama || !kelas) {
+      alert('Nama dan kelas harus diisi!');
+      return;
+    }
+    
+    dataSiswa.push({
+      id: Date.now(),
+      nama: nama,
+      kelas: kelas,
+      status: '-'
+    });
+    
+    document.getElementById('inputNama').value = '';
+    document.getElementById('inputKelas').value = '';
+    document.getElementById('inputNama').focus();
+    
+    simpan();
+    render();
+  }
+  
+  function setStatus(id, status) {
+    const siswa = dataSiswa.find(s => s.id === id);
+    if (siswa) {
+      siswa.status = status;
+      simpan();
+      render();
+    }
+  }
+  
+  function hapusSiswa(id) {
+    if (confirm('Yakin ingin menghapus siswa ini?')) {
+      dataSiswa = dataSiswa.filter(s => s.id !== id);
+      simpan();
+      render();
+    }
+  }
+  
+  function render() {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+    
+    if (dataSiswa.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data siswa. Tambahkan siswa terlebih dahulu.</td></tr>';
+      updateStats();
+      return;
+    }
+    
+    dataSiswa.forEach((s, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${s.nama}</td>
+        <td>${s.kelas}</td>
+        <td>
+          <div class="btn-group">
+            <button class="btn-status btn-hadir ${s.status === 'Hadir' ? 'active' : ''}" onclick="setStatus(${s.id}, 'Hadir')">Hadir</button>
+            <button class="btn-status btn-sakit ${s.status === 'Sakit' ? 'active' : ''}" onclick="setStatus(${s.id}, 'Sakit')">Sakit</button>
+            <button class="btn-status btn-izin ${s.status === 'Izin' ? 'active' : ''}" onclick="setStatus(${s.id}, 'Izin')">Izin</button>
+            <button class="btn-status btn-alpha ${s.status === 'Alpha' ? 'active' : ''}" onclick="setStatus(${s.id}, 'Alpha')">Alpha</button>
+          </div>
+        </td>
+        <td><button class="btn-hapus" onclick="hapusSiswa(${s.id})">Hapus</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    updateStats();
+  }
+  
+  function updateStats() {
+    const stats = { Hadir: 0, Sakit: 0, Izin: 0, Alpha: 0 };
+    dataSiswa.forEach(s => { if (stats[s.status] !== undefined) stats[s.status]++; });
+    
+    document.getElementById('stats').innerHTML = `
+      <span class="stat hadir">Hadir: ${stats.Hadir}</span>
+      <span class="stat sakit">Sakit: ${stats.Sakit}</span>
+      <span class="stat izin">Izin: ${stats.Izin}</span>
+      <span class="stat alpha">Alpha: ${stats.Alpha}</span>
+    `;
+  }
+  
+  function exportData() {
+    if (dataSiswa.length === 0) {
+      alert('Tidak ada data untuk diexport!');
+      return;
+    }
+    
+    let csv = 'No,Nama,Kelas,Status\n';
+    dataSiswa.forEach((s, i) => {
+      csv += `${i + 1},"${s.nama}","${s.kelas}","${s.status}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `absensi_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  }
+  
+  function resetSemua() {
+    if (confirm('Reset semua status kehadiran?')) {
+      dataSiswa.forEach(s => s.status = '-');
+      simpan();
+      render();
+    }
+  }
+  
+  // Enter key untuk tambah siswa
+  document.getElementById('inputKelas').addEventListener('keypress', e => {
+    if (e.key === 'Enter') tambahSiswa();
+  });
+  
+  // Render awal
+  render();
+</script>
+</body>
+</html>
